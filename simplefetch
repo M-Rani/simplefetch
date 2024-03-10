@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+hideinput() {
+	if [ -t 0 ]; then
+		stty -echo -icanon time 0 min 0
+		tput civis
+	fi
+}
+
+cleanup() {
+	if [ -t 0 ]; then
+		stty sane
+		tput cnorm
+	fi
+}
+
+trap cleanup EXIT
+trap hideinput CONT
+hideinput
+
+# Memory Stats
+freeh=$(free -h | grep Mem: | xargs)
+mem_usage=$(cut -d' ' -f3 <<<$freeh)
+mem_total=$(cut -d' ' -f2 <<<$freeh)
+mem_widget="\e[1;30m[\e[0m $mem_usage\e[1;30m/$mem_total ] \e[0m"
+
+# Count Packages
+number_of_packages=$(pacman -Q | wc -l)
+number_of_orphans=$(pacman -Qtdq | wc -l)
+[[ $((number_of_orphans)) == 0 ]] && {
+	pac_widget="\e[1;30m[\e[0m $number_of_packages \e[1;30m]\e[0m"
+} || {
+	pac_widget="\e[1;30m[\e[0m $number_of_packages\e[1;30m($number_of_orphans) ]\e[0m"
+}
+
+# Create Fetch
+output+="▒▄▀▄░▄▀▀   $(tput bold)MEMORY$(tput sgr0) > $mem_widget\n"
+output+="░█▀█░▀▄▄   $(tput bold)PKG(s)$(tput sgr0) > $pac_widget\n"
+
+# Seperator Widget
+UPTIME=$(uptime -p)
+USERS="$(w -h | xargs | cut -d' ' -f1 | wc -l) user(s)"
+SEP_WIDGET="( $(whoami), ${USERS}, ${UPTIME} )"
+for ((i = 0; i < $(tput cols) - ${#SEP_WIDGET}; i++)); do
+	LINE_SEP+='-'
+done
+DIV="$LINE_SEP$SEP_WIDGET"
+
+# Output here
+printf "$output\e[1;30m"
+for ((i = 0; i < ${#DIV}; i++)); do
+	printf "${DIV:$i:1}"
+	sleep $((1 / 100))
+done
+printf "\e[0m\n"
